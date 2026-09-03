@@ -7,15 +7,20 @@ dotenv.config();
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-const PORT = 5000;
+// Render provides PORT automatically.
+// Locally, it will use port 5000.
+const PORT = process.env.PORT || 5000;
 
+// Gemini AI
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
+// SafeSphere AI instructions
 const SAFESPHERE_INSTRUCTIONS = `
 You are SafeSphere AI, an intelligent personal safety assistant.
 
@@ -41,28 +46,33 @@ Your responsibilities:
 10. You are an AI safety assistant, not a replacement for emergency responders.
 `;
 
+// Backend health check
 app.get("/", (req, res) => {
   res.json({
     message: "SafeSphere AI backend is running",
   });
 });
 
+// AI Chat API
 app.post("/api/ai/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
+    // Validate message
     if (!message || typeof message !== "string") {
       return res.status(400).json({
         error: "A valid message is required.",
       });
     }
 
+    // Send request to Gemini
     const interaction = await ai.interactions.create({
       model: "gemini-3.8-flash",
       input: message,
       system_instruction: SAFESPHERE_INSTRUCTIONS,
     });
 
+    // Send AI response to frontend
     res.json({
       reply: interaction.output_text,
     });
@@ -75,8 +85,10 @@ app.post("/api/ai/chat", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// Start server
+// 0.0.0.0 is required for Render deployment.
+app.listen(PORT, "0.0.0.0", () => {
   console.log(
-    `SafeSphere AI backend running on http://localhost:${PORT}`
+    `SafeSphere AI backend running on port ${PORT}`
   );
 });
