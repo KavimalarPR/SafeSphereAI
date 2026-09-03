@@ -1,17 +1,24 @@
-import Navbar from "../components/Navbar";
 import { useState } from "react";
+import Navbar from "../components/Navbar";
 import "./AIAssistant.css";
 
 function AIAssistant() {
   const [messages, setMessages] = useState([
     {
-      role: "assistant",
-      text: "Hello! I'm SafeSphere AI. I can help you with personal safety guidance, emergency situations, and SafeSphere features. How can I help you today?",
+      sender: "ai",
+      text: "Hello! I'm SafeSphere AI. I can help you with personal safety guidance, emergency situations, travel safety, and SafeSphere features. How can I help you today?",
     },
   ]);
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const suggestions = [
+    "I feel unsafe while walking alone",
+    "What should I do in an emergency?",
+    "How can I stay safe while traveling?",
+    "How does SafeSphere SOS work?",
+  ];
 
   const sendMessage = async (messageText = input) => {
     const message = messageText.trim();
@@ -20,11 +27,11 @@ function AIAssistant() {
       return;
     }
 
-    // Add user's message to chat
-    setMessages((previous) => [
-      ...previous,
+    // Add user message
+    setMessages((prev) => [
+      ...prev,
       {
-        role: "user",
+        sender: "user",
         text: message,
       },
     ]);
@@ -34,7 +41,7 @@ function AIAssistant() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/ai/chat",
+        "https://safesphere-ai-backend-cao0.onrender.com/api/ai/chat",
         {
           method: "POST",
           headers: {
@@ -46,29 +53,76 @@ function AIAssistant() {
         }
       );
 
-      const data = await response.json();
+      // Try to read backend response
+      let data = {};
 
-      if (!response.ok) {
-        throw new Error(data.error || "AI request failed");
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
       }
 
-      setMessages((previous) => [
-        ...previous,
+      // Gemini quota exceeded
+      if (response.status === 429) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "ai",
+            text: "⚠️ SafeSphere AI has temporarily reached its Gemini API usage limit. Please try again after some time.",
+            error: true,
+          },
+        ]);
+
+        return;
+      }
+
+      // Backend/server error
+      if (!response.ok) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "ai",
+            text:
+              data.error ||
+              "SafeSphere AI is temporarily unavailable. Please try again later.",
+            error: true,
+          },
+        ]);
+
+        return;
+      }
+
+      // No AI response
+      if (!data.reply) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "ai",
+            text: "SafeSphere AI did not return a response. Please try again.",
+            error: true,
+          },
+        ]);
+
+        return;
+      }
+
+      // Successful AI response
+      setMessages((prev) => [
+        ...prev,
         {
-          role: "assistant",
-          text:
-            data.reply ||
-            "I'm sorry, I couldn't generate a response.",
+          sender: "ai",
+          text: data.reply,
         },
       ]);
     } catch (error) {
-      console.error("AI Assistant error:", error);
+      console.error("AI Assistant Error:", error);
 
-      setMessages((previous) => [
-        ...previous,
+      setMessages((prev) => [
+        ...prev,
         {
-          role: "assistant",
-          text: "I'm unable to connect to SafeSphere AI right now. Please make sure the SafeSphere backend is running.",
+          sender: "ai",
+          text: "⚠️ Unable to connect to SafeSphere AI. Please check your internet connection or try again later.",
+          error: true,
         },
       ]);
     } finally {
@@ -76,13 +130,9 @@ function AIAssistant() {
     }
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const handleSubmit = (e) => {
+    e.preventDefault();
     sendMessage();
-  };
-
-  const handleSuggestion = (suggestion) => {
-    sendMessage(suggestion);
   };
 
   return (
@@ -93,126 +143,107 @@ function AIAssistant() {
         <div className="ai-container">
 
           {/* Header */}
-          <header className="ai-header">
-            <div className="ai-header-icon">
-              ✦
-            </div>
-
+          <section className="ai-header">
             <div>
-              <div className="ai-label">
+              <span className="ai-badge">
                 SAFETY INTELLIGENCE
-              </div>
+              </span>
 
               <h1>SafeSphere AI</h1>
 
               <p>
-                Your intelligent personal safety assistant
+                Your intelligent personal safety assistant for
+                guidance, emergency awareness, and safer decisions.
               </p>
             </div>
 
-            <div className="ai-online">
-              <span></span>
-              AI ONLINE
+            <div className="ai-status">
+              <span className="status-dot"></span>
+              AI Assistant
             </div>
-          </header>
+          </section>
 
-          {/* Chat area */}
+          {/* Chat Card */}
           <section className="ai-chat-card">
 
-            <div className="ai-chat-messages">
+            {/* Messages */}
+            <div className="chat-messages">
+
               {messages.map((message, index) => (
                 <div
                   key={index}
-                  className={`ai-message ${
-                    message.role === "user"
+                  className={`message-row ${
+                    message.sender === "user"
                       ? "user-message"
-                      : "assistant-message"
+                      : "ai-message"
                   }`}
                 >
-                  {message.role === "assistant" && (
-                    <div className="message-avatar">
-                      ✦
+
+                  {/* AI Avatar */}
+                  {message.sender === "ai" && (
+                    <div className="ai-avatar">
+                      AI
                     </div>
                   )}
 
-                  <div className="message-content">
-                    <div className="message-name">
-                      {message.role === "user"
-                        ? "YOU"
-                        : "SAFESPHERE AI"}
-                    </div>
-
-                    <div className="message-text">
-                      {message.text}
-                    </div>
+                  {/* Message */}
+                  <div
+                    className={`message-bubble ${
+                      message.error
+                        ? "error-message"
+                        : ""
+                    }`}
+                  >
+                    {message.text}
                   </div>
+
                 </div>
               ))}
 
-              {/* Loading indicator */}
+              {/* Loading */}
               {loading && (
-                <div className="ai-message assistant-message">
-                  <div className="message-avatar">
-                    ✦
+                <div className="message-row ai-message">
+
+                  <div className="ai-avatar">
+                    AI
                   </div>
 
-                  <div className="message-content">
-                    <div className="message-name">
-                      SAFESPHERE AI
-                    </div>
-
-                    <div className="typing-indicator">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
+                  <div className="message-bubble typing">
+                    <span></span>
+                    <span></span>
+                    <span></span>
                   </div>
+
                 </div>
               )}
+
             </div>
 
             {/* Suggestions */}
-            {messages.length === 1 && !loading && (
-              <div className="ai-suggestions">
-                <button
-                  onClick={() =>
-                    handleSuggestion(
-                      "I am walking alone at night. What safety precautions should I take?"
-                    )
-                  }
-                >
-                  🌙 Walking alone at night
-                </button>
+            {messages.length === 1 && (
+              <div className="suggestions">
 
-                <button
-                  onClick={() =>
-                    handleSuggestion(
-                      "I feel unsafe right now. What should I do?"
-                    )
-                  }
-                >
-                  🛡️ I feel unsafe
-                </button>
+                <p>Try asking:</p>
 
-                <button
-                  onClick={() =>
-                    handleSuggestion(
-                      "What should I do during an emergency?"
-                    )
-                  }
-                >
-                  🚨 Emergency guidance
-                </button>
+                <div className="suggestion-list">
 
-                <button
-                  onClick={() =>
-                    handleSuggestion(
-                      "How can SafeSphere help keep me safe?"
+                  {suggestions.map(
+                    (suggestion, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() =>
+                          sendMessage(suggestion)
+                        }
+                        disabled={loading}
+                      >
+                        {suggestion}
+                      </button>
                     )
-                  }
-                >
-                  ✦ SafeSphere features
-                </button>
+                  )}
+
+                </div>
+
               </div>
             )}
 
@@ -221,41 +252,49 @@ function AIAssistant() {
               className="ai-input-area"
               onSubmit={handleSubmit}
             >
+
               <textarea
                 value={input}
-                onChange={(event) =>
-                  setInput(event.target.value)
+                onChange={(e) =>
+                  setInput(e.target.value)
                 }
                 placeholder="Ask SafeSphere AI about your safety..."
                 rows="1"
                 disabled={loading}
-                onKeyDown={(event) => {
+                onKeyDown={(e) => {
+
                   if (
-                    event.key === "Enter" &&
-                    !event.shiftKey
+                    e.key === "Enter" &&
+                    !e.shiftKey
                   ) {
-                    event.preventDefault();
-                    handleSubmit(event);
+                    e.preventDefault();
+                    handleSubmit(e);
                   }
+
                 }}
               />
 
               <button
                 type="submit"
-                className="ai-send-button"
-                disabled={!input.trim() || loading}
+                className="send-button"
+                disabled={
+                  loading ||
+                  !input.trim()
+                }
               >
-                {loading ? "..." : "➤"}
+                {loading ? "..." : "Send"}
               </button>
+
             </form>
 
+            {/* Disclaimer */}
             <div className="ai-disclaimer">
-              <span>⚠</span>
-              SafeSphere AI provides safety guidance but is
-              not a replacement for emergency services.
+              SafeSphere AI provides general safety guidance
+              and is not a replacement for emergency services
+              or professional assistance.
             </div>
-          </section>
 
+          </section>
         </div>
       </main>
     </>
