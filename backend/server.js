@@ -7,12 +7,9 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Render provides PORT automatically.
-// Locally, it will use port 5000.
 const PORT = process.env.PORT || 5000;
 
 // Gemini AI
@@ -44,12 +41,15 @@ Your responsibilities:
 8. For medical emergencies, recommend professional medical or emergency assistance.
 9. When appropriate, explain which SafeSphere feature the user can use.
 10. You are an AI safety assistant, not a replacement for emergency responders.
+
+Keep responses calm, helpful, practical, and concise.
 `;
 
 // Backend health check
 app.get("/", (req, res) => {
   res.json({
     message: "SafeSphere AI backend is running",
+    status: "online",
   });
 });
 
@@ -65,6 +65,15 @@ app.post("/api/ai/chat", async (req, res) => {
       });
     }
 
+    // Prevent very large messages
+    if (message.length > 2000) {
+      return res.status(400).json({
+        error: "Message is too long. Please keep it under 2000 characters.",
+      });
+    }
+
+    console.log("Received AI request:", message);
+
     // Send request to Gemini
     const interaction = await ai.interactions.create({
       model: "gemini-3.8-flash",
@@ -72,21 +81,75 @@ app.post("/api/ai/chat", async (req, res) => {
       system_instruction: SAFESPHERE_INSTRUCTIONS,
     });
 
-    // Send AI response to frontend
-    res.json({
-      reply: interaction.output_text,
+    const reply = interaction.output_text;
+
+    // Check for empty response
+    if (!reply) {
+      console.error("Gemini returned an empty response.");
+
+      return res.status(500).json({
+        error: "SafeSphere AI returned an empty response.",
+      });
+    }
+
+    console.log("Gemini response received successfully.");
+
+    // Send AI response
+    return res.status(200).json({
+      reply,
     });
   } catch (error) {
-    console.error("Gemini API error:", error);
+    console.error("=================================");
+    console.error("GEMINI API ERROR");
+    console.error("Status:", error?.status);
+    console.error("Message:", error?.message);
+    console.error("=================================");
 
-    res.status(500).json({
-      error: "Unable to get a response from SafeSphere AI.",
+    const errorMessage = error?.message || "";
+
+    // Gemini quota / rate limit
+    if (
+      error?.status === 429 ||
+      errorMessage.includes("429") ||
+      errorMessage.toLowerCase().includes("quota") ||
+      errorMessage.toLowerCase().includes("rate limit") ||
+      errorMessage.toLowerCase().includes("resource exhausted")
+    ) {
+      return res.status(429).json({
+        error:
+          "SafeSphere AI has temporarily reached its Gemini API usage limit. Please try again later.",
+      });
+    }
+
+    // Invalid API key / authentication
+    if (
+      error?.status === 401 ||
+      error?.status === 403 ||
+      errorMessage.toLowerCase().includes("api key") ||
+      errorMessage.toLowerCase().includes("authentication")
+    ) {
+      return res.status(500).json({
+        error:
+          "SafeSphere AI authentication failed. Please check the Gemini API configuration.",
+      });
+    }
+
+    // Other Gemini/server error
+    return res.status(500).json({
+      error:
+        "SafeSphere AI is temporarily unavailable. Please try again later.",
     });
   }
 });
 
+// Unknown route
+app.use((req, res) => {
+  res.status(404).json({
+    error: "API endpoint not found.",
+  });
+});
+
 // Start server
-// 0.0.0.0 is required for Render deployment.
 app.listen(PORT, "0.0.0.0", () => {
   console.log(
     `SafeSphere AI backend running on port ${PORT}`
