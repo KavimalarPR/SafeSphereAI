@@ -10,6 +10,14 @@ SafeSphere AI is a full-stack personal safety platform designed to provide fast 
 
 Note: The AI Assistant uses the Gemini API. Availability may be affected by the API's free-tier usage limits.
 
+## 📸 Screenshots
+
+### 🏠 Home
+![SafeSphere Home](Screenshots/home.png)
+
+### 📊 Safety Dashboard
+![SafeSphere Dashboard](Screenshots/dashboard.png)
+
 ✨ Features
 🚨 Emergency SOS
 One-tap emergency assistance with the user's current location and access to emergency contacts.
