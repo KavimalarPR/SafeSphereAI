@@ -4,8 +4,9 @@ Live Demo Frontend Backend AI
 
 SafeSphere AI is a full-stack personal safety platform designed to provide fast access to emergency assistance, location-based safety services, emergency contacts, and AI-powered safety guidance.
 
-🚀 Live Demo
-Open SafeSphere AI
+## 🚀 Live Demo
+
+🔗 **[Try SafeSphere Live](https://safesphere-183f6.web.app)**
 
 Note: The AI Assistant uses the Gemini API. Availability may be affected by the API's free-tier usage limits.
 
